@@ -1,0 +1,15 @@
+# Virtual environment
+venv/
+
+# Downloaded model weights (auto-downloaded on first run)
+*.pt
+
+# Generated outputs
+output/
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Ultralytics run logs
+runs/
