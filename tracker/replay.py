@@ -77,7 +77,13 @@ def reaggregate(meta: dict, tracks_path: str,
     group_votes: dict[int, Counter] = defaultdict(Counter)
     for rid, t in final_teams.items():
         group_votes[uf.find(rid)][t] += 1
-    canonical_team = {c: v.most_common(1)[0][0] for c, v in group_votes.items()}
+    # Prefer a KNOWN team for the group: if any fragment was confidently classified
+    # (0/1), the whole merged player inherits the majority of those — an unknown
+    # fragment shouldn't drag a player to "unknown" when a sibling fragment knows it.
+    def _group_team(v: Counter) -> int:
+        known = {t: n for t, n in v.items() if t in (0, 1)}
+        return max(known, key=known.get) if known else v.most_common(1)[0][0]
+    canonical_team = {c: _group_team(v) for c, v in group_votes.items()}
 
     def team_for(canon: int, frame_team: int) -> int:
         if canon in team_overrides:
