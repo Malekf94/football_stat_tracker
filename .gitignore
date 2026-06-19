@@ -13,3 +13,9 @@ __pycache__/
 
 # Ultralytics run logs
 runs/
+
+# Training dataset: keep the hand-corrected labels + data.yaml (the real work),
+# but not the 67 MB of sampled frames (regeneratable via make_dataset.py) or the
+# ultralytics label cache.
+dataset/images/
+*.cache

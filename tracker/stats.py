@@ -58,6 +58,11 @@ class StatsAggregator:
             if pid is not None:
                 self.players[pid]["defensive_contributions"] += 1
                 self.players[pid]["team"] = team
+            # Player who lost the ball gets a failed pass attempt (reduces their pass %)
+            lost_by = event.get("lost_by")
+            if lost_by is not None:
+                self.players[lost_by]["passes_attempted"] += 1
+                self.players[lost_by]["team"] = event.get("from_team", -1)
 
     def tick_possession(self, tracker_id: int | None, team: int) -> None:
         """Call once per processed frame for the current ball-holder."""
@@ -69,16 +74,20 @@ class StatsAggregator:
     # Output
     # ------------------------------------------------------------------
 
-    def get_dataframe(self, fps: float, skip_frames: int) -> pd.DataFrame:
+    def get_dataframe(self, fps: float, skip_frames: int, min_possession_s: float = 3.0,
+                      id_map: dict | None = None) -> pd.DataFrame:
         rows = []
         for pid, s in self.players.items():
+            poss_sec = s["possession_frames"] * skip_frames / fps
+            # Drop ghost tracks: no meaningful activity and barely any possession
+            if poss_sec < min_possession_s and s["goals"] == 0 and s["assists"] == 0:
+                continue
             pass_pct = (
                 f"{100 * s['passes_completed'] / s['passes_attempted']:.0f}%"
                 if s["passes_attempted"] > 0 else "—"
             )
-            poss_sec = s["possession_frames"] * skip_frames / fps
             rows.append({
-                "Player ID":               pid,
+                "Player ID":               id_map.get(pid, pid) if id_map else pid,
                 "Team":                    s["team"] if s["team"] >= 0 else "?",
                 "Goals":                   s["goals"],
                 "Assists":                 s["assists"],
@@ -95,14 +104,14 @@ class StatsAggregator:
         df = pd.DataFrame(rows).sort_values(["Team", "Goals"], ascending=[True, False])
         return df.reset_index(drop=True)
 
-    def print_summary(self, fps: float, skip_frames: int) -> None:
+    def print_summary(self, fps: float, skip_frames: int, id_map: dict | None = None) -> None:
         line = "=" * 70
         print(f"\n{line}")
         print("  MATCH STATS")
         print(line)
         print(f"  Team 0 goals: {self.team_goals[0]}   |   Team 1 goals: {self.team_goals[1]}")
         print(line)
-        df = self.get_dataframe(fps, skip_frames)
+        df = self.get_dataframe(fps, skip_frames, id_map=id_map)
         if not df.empty:
             print(df.to_string(index=False))
         else:

@@ -1,0 +1,5 @@
+path: E:/footballVids/football_stat_tracker/dataset
+train: images
+val: images
+nc: 2
+names: ['player', 'ball']

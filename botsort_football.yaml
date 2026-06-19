@@ -1,0 +1,26 @@
+# BoT-SORT config tuned for panning Veo camera football footage.
+# Used by tracker/detection.py via model.track(tracker=...).
+
+tracker_type: botsort
+
+# Detection score thresholds
+track_high_thresh: 0.25
+track_low_thresh: 0.1
+new_track_thresh: 0.4
+
+# Keep lost tracks alive longer — players leave the panning frame often,
+# and ReID lets us recover their original ID when they return.
+track_buffer: 120
+
+match_thresh: 0.8
+fuse_score: True
+
+# Camera motion compensation — estimates the Veo pan/zoom each frame and
+# corrects track positions for it. This is the main fix for the panning camera.
+gmc_method: sparseOptFlow
+
+# Appearance re-identification (ReID)
+proximity_thresh: 0.5
+appearance_thresh: 0.8
+with_reid: True
+model: auto   # reuse the YOLO detector's own features — no extra download
