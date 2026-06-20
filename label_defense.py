@@ -18,9 +18,10 @@ Controls
   Trackbar / , . : scrub one logged frame back / forward
   [  ]           : jump 10 logged frames back / forward
   left-click     : select the player under the cursor (the one who made the action)
-  m  or  SPACE   : MARK a defensive action by the selected player at this frame
-  t b i c s      : set the action TYPE tag (tackle / block / interception /
-                   clearance / save). Stored for reference; training groups them.
+  t b i c s      : MARK a defensive action by the selected player at this frame,
+                   tagged tackle / block / interception / clearance / save. The tag
+                   is stored for reference; training groups them as one class.
+  m  or  SPACE   : MARK with a generic "defensive" tag (when you don't care which type)
   u              : undo the last mark
   w              : save labels now  ->  output/<base>_defense_labels.json
   q / ESC        : save + quit
@@ -71,12 +72,17 @@ def main(video_path: str):
     if not frames:
         sys.exit("Tracks log is empty.")
 
-    labels_path = os.path.join(out_dir, f"{base}_defense_labels.json")
+    # Labels live in a TRACKED folder (the hand-work), not the git-ignored output/.
+    labels_dir = "defense_labels"
+    os.makedirs(labels_dir, exist_ok=True)
+    labels_path = os.path.join(labels_dir, f"{base}_defense_labels.json")
+    legacy_path = os.path.join(out_dir, f"{base}_defense_labels.json")
     labels: list[dict] = []
-    if os.path.exists(labels_path):
-        with open(labels_path, encoding="utf-8") as f:
+    src = labels_path if os.path.exists(labels_path) else (legacy_path if os.path.exists(legacy_path) else None)
+    if src:
+        with open(src, encoding="utf-8") as f:
             labels = json.load(f).get("labels", [])
-        print(f"[Load] {len(labels)} existing labels from {labels_path}")
+        print(f"[Load] {len(labels)} existing labels from {src}")
 
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
@@ -170,10 +176,10 @@ def main(video_path: str):
         cv2.rectangle(disp, (0, 0), (dw, 46), (0, 0, 0), -1)
         sel_txt = f"#{display_map.get(state['selected'], state['selected'])}" if state["selected"] else "none"
         hud = (f"{_fmt_time(fno / fps)}  f{fno}  [{state['idx']+1}/{len(frames)}]   "
-               f"selected: {sel_txt}   type: {state['type']}   marks: {len(labels)}")
+               f"selected: {sel_txt}   marks: {len(labels)}")
         cv2.putText(disp, hud, (8, 18), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
                     (0, 230, 230), 1, cv2.LINE_AA)
-        cv2.putText(disp, "click player + M=mark  t/b/i/c/s=type  u=undo  w=save  q=quit",
+        cv2.putText(disp, "click player, then s/b/t/i/c marks it (M=generic)  u=undo  w=save  q=quit",
                     (8, 38), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (200, 200, 200), 1, cv2.LINE_AA)
         if here:
             cv2.putText(disp, f"MARKED HERE: " + ", ".join(f"#{m['display_id']}({m['type']})" for m in here),
@@ -181,6 +187,23 @@ def main(video_path: str):
 
         cv2.imshow(win, disp)
         key = cv2.waitKey(20) & 0xFF
+
+        def do_mark(action_type: str):
+            """Record a defensive action of action_type by the selected player here."""
+            if state["selected"] is None:
+                print("[!] Click a player first, then press the type key (or M).")
+                return
+            tid = state["selected"]
+            labels.append({
+                "frame": fno, "track_id": tid,
+                "display_id": display_map.get(tid, tid),
+                "team": final_teams.get(tid, -1), "type": action_type,
+                "ball": ball, "time": round(fno / fps, 2),
+            })
+            state["type"] = action_type
+            state["selected"] = None      # deselect so the next action needs a fresh click
+            print(f"  + marked {action_type} by #{display_map.get(tid, tid)} "
+                  f"at {_fmt_time(fno / fps)} (f{fno})  [{len(labels)} total]")
 
         if key in (ord('.'), ord('d')):
             state["idx"] = min(len(frames) - 1, state["idx"] + 1)
@@ -190,22 +213,10 @@ def main(video_path: str):
             state["idx"] = min(len(frames) - 1, state["idx"] + 10)
         elif key == ord('['):
             state["idx"] = max(0, state["idx"] - 10)
-        elif key in TYPE_KEYS:
-            state["type"] = TYPE_KEYS[key]
-        elif key in (ord('m'), ord(' ')):
-            if state["selected"] is None:
-                print("[!] Click a player first, then press M.")
-            else:
-                tid = state["selected"]
-                team = final_teams.get(tid, -1)
-                labels.append({
-                    "frame": fno, "track_id": tid,
-                    "display_id": display_map.get(tid, tid),
-                    "team": team, "type": state["type"],
-                    "ball": ball, "time": round(fno / fps, 2),
-                })
-                print(f"  + marked {state['type']} by #{display_map.get(tid, tid)} "
-                      f"at {_fmt_time(fno / fps)} (f{fno})  [{len(labels)} total]")
+        elif key in TYPE_KEYS:        # type key marks immediately
+            do_mark(TYPE_KEYS[key])
+        elif key in (ord('m'), ord(' ')):   # generic mark (no specific type)
+            do_mark("defensive")
         elif key == ord('u'):
             if labels:
                 m = labels.pop()

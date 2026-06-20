@@ -1,0 +1,166 @@
+{
+  "base": "testing match",
+  "video_path": "E:\\footballVids\\testing match.mp4",
+  "fps": 29.97002997002997,
+  "skip_frames": 3,
+  "frame_w": 1920,
+  "frame_h": 1080,
+  "labels": [
+    {
+      "frame": 237,
+      "track_id": 181,
+      "display_id": 18,
+      "team": 0,
+      "type": "save",
+      "ball": [
+        1808.2,
+        701.8
+      ],
+      "time": 7.91
+    },
+    {
+      "frame": 228,
+      "track_id": 181,
+      "display_id": 18,
+      "team": 0,
+      "type": "save",
+      "ball": [
+        1808.2,
+        701.8
+      ],
+      "time": 7.61
+    },
+    {
+      "frame": 2478,
+      "track_id": 1330,
+      "display_id": 140,
+      "team": 1,
+      "type": "block",
+      "ball": [
+        712.9,
+        392.9
+      ],
+      "time": 82.68
+    },
+    {
+      "frame": 3111,
+      "track_id": 1419,
+      "display_id": 163,
+      "team": 1,
+      "type": "save",
+      "ball": [
+        352.6,
+        403.8
+      ],
+      "time": 103.8
+    },
+    {
+      "frame": 3195,
+      "track_id": 1421,
+      "display_id": 164,
+      "team": 0,
+      "type": "tackle",
+      "ball": [
+        810.0,
+        833.6
+      ],
+      "time": 106.61
+    },
+    {
+      "frame": 3453,
+      "track_id": 1417,
+      "display_id": 161,
+      "team": 1,
+      "type": "block",
+      "ball": [
+        1699.3,
+        427.8
+      ],
+      "time": 115.22
+    },
+    {
+      "frame": 3483,
+      "track_id": 1530,
+      "display_id": 189,
+      "team": -1,
+      "type": "defensive",
+      "ball": [
+        1649.1,
+        424.6
+      ],
+      "time": 116.22
+    },
+    {
+      "frame": 3564,
+      "track_id": 1413,
+      "display_id": 159,
+      "team": 0,
+      "type": "clearance",
+      "ball": [
+        1504.4,
+        496.6
+      ],
+      "time": 118.92
+    },
+    {
+      "frame": 4335,
+      "track_id": 1638,
+      "display_id": 204,
+      "team": 0,
+      "type": "save",
+      "ball": [
+        435.2,
+        1008.1
+      ],
+      "time": 144.64
+    },
+    {
+      "frame": 4695,
+      "track_id": 1793,
+      "display_id": 218,
+      "team": 0,
+      "type": "interception",
+      "ball": [
+        1214.1,
+        512.2
+      ],
+      "time": 156.66
+    },
+    {
+      "frame": 5022,
+      "track_id": 1796,
+      "display_id": 219,
+      "team": 0,
+      "type": "interception",
+      "ball": [
+        703.9,
+        712.6
+      ],
+      "time": 167.57
+    },
+    {
+      "frame": 6021,
+      "track_id": 2170,
+      "display_id": 274,
+      "team": 1,
+      "type": "interception",
+      "ball": [
+        1378.8,
+        559.5
+      ],
+      "time": 200.9
+    },
+    {
+      "frame": 6252,
+      "track_id": 2103,
+      "display_id": 268,
+      "team": 0,
+      "type": "interception",
+      "ball": [
+        1067.0,
+        391.6
+      ],
+      "time": 208.61
+    }
+  ]
+}

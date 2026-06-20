@@ -19,3 +19,8 @@ runs/
 # ultralytics label cache.
 dataset/images/
 *.cache
+
+# Defensive-action video clips (regeneratable from labels via make_defense_dataset.py)
+dataset_defense/
+# Trained defensive-action model weights (large; regeneratable via train_defense.py)
+runs_defense/
