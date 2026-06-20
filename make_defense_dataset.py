@@ -28,9 +28,13 @@ import numpy as np
 T = 16                 # frames per clip
 CROP_SCALE = 2.5       # square crop = this * subject box height (context around player)
 OUT = 112              # output clip resolution
-NEG_PER_POS = 2        # negatives sampled per positive (half hard, half random)
 EXCLUDE_S = 1.0        # a negative must be at least this far (s) from any positive
 DEDUPE_FRAMES = 15     # merge positive marks of same player within this many frames
+NEG_STRIDE = 5         # candidates sampled every this many logged frames
+NEG_RATIO = 5          # negatives per positive
+K_NEAR = 5             # consider the K nearest players to the ball (the defender isn't always #1)
+RADIUS_MULT = 3.0      # ...within this * near_px of the ball
+POS_WIN_S = 1.0        # a candidate is POSITIVE if within this (s) of a labelled action by the SAME player
 OUT_DIR = "dataset_defense"
 
 random.seed(42)
@@ -95,74 +99,51 @@ def subject_boxes(m, subject, frames):
     return [b if b is not None else first for b in boxes], (first is not None)
 
 
-def make_specs(m):
-    """Return list of (center_frame, subject_track, label) for one match."""
-    logged = m["logged"]
-    fidx = frame_index_cache(logged)
+def gen_candidates(m, stride, k=K_NEAR, radius_mult=RADIUS_MULT):
+    """Candidate (frame, player) pairs = the K players nearest the ball (within
+    radius_mult * near_px) at every `stride`-th logged frame. The defender who
+    makes a tackle/block is often NOT the closest to the ball (the attacker is),
+    so we look at several near-ball players. TRAINING and INFERENCE both use this,
+    so the model sees the same distribution either way."""
     H = m["meta"].get("frame_h", 1080)
-    near_px = max(70, int(0.06 * H))
-    specs = []
-
-    # --- positives (dedupe same player within DEDUPE_FRAMES) ---
-    pos = sorted(m["labels"], key=lambda l: l["frame"])
-    kept = []
-    for l in pos:
-        c = l["frame"] if l["frame"] in fidx else min(logged, key=lambda x: abs(x - l["frame"]))
-        tid = int(l["track_id"])
-        if any(s[1] == tid and abs(s[0] - c) <= DEDUPE_FRAMES for s in kept):
-            continue
-        kept.append((c, tid))
-    for c, tid in kept:
-        specs.append((c, tid, 1))
-    pos_centers = [c for c, _ in kept]
-    excl = int(EXCLUDE_S * m["meta"]["fps"])
-
-    def far_from_pos(f):
-        return all(abs(f - pc) > excl for pc in pos_centers)
-
-    # need enough room for a full window
-    valid = [f for f in logged if fidx[f] >= T and fidx[f] < len(logged) - T]
-
-    # --- hard negatives: a player near the ball but not near any positive ---
-    n_neg = len(kept) * NEG_PER_POS
-    n_hard = n_neg // 2
-    hard = []
-    for f in random.sample(valid, min(len(valid), 4000)):
-        if not far_from_pos(f):
-            continue
+    radius = max(70, int(0.06 * H)) * radius_mult
+    logged = m["logged"]
+    out = []
+    for i in range(T, len(logged) - T, stride):
+        f = logged[i]
         ball = m["frame_ball"].get(f)
         if not ball:
             continue
-        players = m["frame_players"].get(f, {})
-        best, bd = None, 1e9
-        for tid, (x1, y1, x2, y2) in players.items():
+        ds = []
+        for tid, (x1, y1, x2, y2) in m["frame_players"].get(f, {}).items():
             cx, cy = (x1 + x2) / 2, y2
             d = ((cx - ball[0]) ** 2 + (cy - ball[1]) ** 2) ** 0.5
-            if d < bd:
-                best, bd = tid, d
-        if best is not None and bd < near_px:
-            hard.append((f, best))
-        if len(hard) >= n_hard:
-            break
-    for f, tid in hard:
-        specs.append((f, tid, 0))
+            if d < radius:
+                ds.append((d, tid))
+        ds.sort()
+        for _, tid in ds[:k]:
+            out.append((f, tid))
+    return out
 
-    # --- random negatives: any sizeable player at a non-positive moment ---
-    n_rand = n_neg - len(hard)
-    tries, added = 0, 0
-    while added < n_rand and tries < n_rand * 50:
-        tries += 1
-        f = random.choice(valid)
-        if not far_from_pos(f):
-            continue
-        players = m["frame_players"].get(f, {})
-        big = [tid for tid, (x1, y1, x2, y2) in players.items()
-               if (y2 - y1) >= 0.06 * H]
-        if not big:
-            continue
-        specs.append((f, random.choice(big), 0))
-        added += 1
-    return specs
+
+def make_specs(m):
+    """Return list of (center_frame, subject_track, label) for one match.
+
+    A candidate is POSITIVE iff it's the SAME player as a labelled action within
+    POS_WIN_S; every other candidate is a negative — including the OTHER near-ball
+    players at an action moment, which are exactly the hard negatives we want
+    (the model must pick the defender out of the near-ball cluster)."""
+    W = int(POS_WIN_S * m["meta"]["fps"])
+    acts = [(int(l["frame"]), int(l["track_id"])) for l in m["labels"]]
+
+    pos, neg = [], []
+    for f, tid in gen_candidates(m, NEG_STRIDE):
+        if any(abs(f - af) <= W and tid == at for af, at in acts):
+            pos.append((f, tid, 1))
+        else:
+            neg.append((f, tid, 0))
+    random.shuffle(neg)
+    return pos + neg[:NEG_RATIO * len(pos)]
 
 
 def extract_clip(cap, m, center, subject):
